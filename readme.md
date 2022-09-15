@@ -1,5 +1,12 @@
 # gamecloud
 
+## Installation
+
+```sh
+curl -L "https://github.com/crispyricepc/gamecloud/raw/main/gamecloud.sh" > ~/.local/bin/gamecloud
+chmod +x ~/.local/bin/gamecloud
+```
+
 ## Usage
 
 ```sh
