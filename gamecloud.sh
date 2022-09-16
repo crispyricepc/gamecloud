@@ -33,7 +33,7 @@ configure_gamecloud() {
     ' .[$game_name].remote_path = $remote_path | .[$game_name].local_path = $local_path' "$CONFIG_PATH" > "$CONFIG_PATH.tmp"
   mv "$CONFIG_PATH.tmp" "$CONFIG_PATH"
 
-  echo -n "Do you want to upload your save files now? [y/N]: "
+  echo -n "Do you want to upload your save files now? (first time sync usually takes a while) [y/N]: "
   read -r upload; [ "$upload" = "y" ] &&\
     gamecloud_upload "$game_name" "$remote_path" "$local_path"
 }
@@ -74,7 +74,7 @@ gamecloud_download() {
   local local_path="$3"
 
   zenity --notification --text="Syncing save from $remote_path/$game_name to $local_path"
-  rclone sync "$remote_path/$game_name" "$local_path"
+  rclone sync -P "$remote_path/$game_name" "$local_path"
 }
 
 gamecloud_upload() {
@@ -83,11 +83,8 @@ gamecloud_upload() {
   local local_path="$3"
 
   zenity --notification --text="Syncing save from $local_path to $remote_path/$game_name"
-  jq -n\
-    --arg hostname "$(hostnamectl hostname)" \
-    --arg mtime "$(find "$local_path" -type f -printf "%T@\n" | sort -n | tail -n1 | cut -d . -f 1)" \
-    '{"hostname": $hostname, "mtime": $mtime}' | rclone rcat "$remote_path/$game_name.gamecloud.json"
-  rclone sync $local_path $remote_path/$game_name
+  echo "{\"hostname\": \"$(hostnamectl hostname)\", \"mtime\": \"$(find "$local_path" -type f -printf "%T@\n" | sort -n | tail -n1 | cut -d . -f 1)\"}" | rclone rcat "$remote_path/$game_name.gamecloud.json"
+  # rclone sync -P $local_path $remote_path/$game_name
 }
 
 on_sigint() {
