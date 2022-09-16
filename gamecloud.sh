@@ -3,6 +3,7 @@
 # Dependencies:
 #   rclone
 #   jq
+#   zenity
 
 # Usage:
 #   gamecloud [-r|--run <name> <command>] [-c|--config <name>] [-h|--help]
@@ -31,6 +32,10 @@ configure_gamecloud() {
     --arg local_path "$local_path" \
     ' .[$game_name].remote_path = $remote_path | .[$game_name].local_path = $local_path' "$CONFIG_PATH" > "$CONFIG_PATH.tmp"
   mv "$CONFIG_PATH.tmp" "$CONFIG_PATH"
+
+  echo -n "Do you want to upload your save files now? [y/N]: "
+  read -r upload; [ "$upload" = "y" ] &&\
+    gamecloud_upload "$game_name" "$remote_path" "$local_path"
 }
 
 gamecloud_run() {
@@ -41,33 +46,53 @@ gamecloud_run() {
   [ -z "$remote_path" ] && echo "No remote path configured for $game_name" && exit 1
   [ -z "$local_path" ] && echo "No local path configured for $game_name" && exit 1
 
-  gamecloud_pre "$game_name" "$remote_path" "$local_path"
+  local local_mtime=$(find "$local_path" -type f -printf "%T@\n" | sort -n | tail -n1 | cut -d . -f 1)
+  local local_hostname=$(hostnamectl hostname)
+  local remote_mtime
+  local remote_hostname
+  read remote_mtime remote_hostname < <(echo $(rclone cat "$remote_path/$game_name.gamecloud.json" | jq -r '.mtime, .hostname'))
+
+  local conflict_prompt="Cloud save conflict: The locally stored save data is newer than the cloud.\n\n"\
+"Local save time: $(date -d @$local_mtime)\n\tMachine: $local_hostname\n"\
+"Cloud save time: $(date -d @$remote_mtime)\n\tMachine: $remote_hostname\n\n"\
+"Would you like to use your locally saved data (deleting data stored on the cloud)?"
+
+  if [ "$local_mtime" -gt "$remote_mtime" ] && zenity --question --title="Cloud save conflict" --text="$conflict_prompt"; then
+    gamecloud_upload "$game_name" "$remote_path" "$local_path"
+  else
+    gamecloud_download "$game_name" "$remote_path" "$local_path"
+  fi
+
   trap on_sigint SIGINT
   shift; "$@"
-  gamecloud_post "$game_name" "$remote_path" "$local_path"
+  gamecloud_upload "$game_name" "$remote_path" "$local_path"
 }
 
-gamecloud_pre() {
+gamecloud_download() {
   local game_name="$1"
   local remote_path="$2"
   local local_path="$3"
 
-  echo "Syncing save from $remote_path/$game_name to $local_path"
+  zenity --notification --text="Syncing save from $remote_path/$game_name to $local_path"
   rclone sync "$remote_path/$game_name" "$local_path"
 }
 
-gamecloud_post() {
+gamecloud_upload() {
   local game_name="$1"
   local remote_path="$2"
   local local_path="$3"
 
-  echo "Syncing save from $local_path to $remote_path/$game_name"
+  zenity --notification --text="Syncing save from $local_path to $remote_path/$game_name"
+  jq -n\
+    --arg hostname "$(hostnamectl hostname)" \
+    --arg mtime "$(find "$local_path" -type f -printf "%T@\n" | sort -n | tail -n1 | cut -d . -f 1)" \
+    '{"hostname": $hostname, "mtime": $mtime}' | rclone rcat "$remote_path/$game_name.gamecloud.json"
   rclone sync $local_path $remote_path/$game_name
 }
 
 on_sigint() {
   echo "Caught SIGINT, cleaning up and exiting"
-  gamecloud_post
+  gamecloud_upload
   exit 1
 }
 
