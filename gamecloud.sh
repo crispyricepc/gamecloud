@@ -75,6 +75,7 @@ gamecloud_download() {
 
   zenity --notification --text="Syncing save from $remote_path/$game_name to $local_path"
   rclone sync -P "$remote_path/$game_name" "$local_path"
+  zenity --notification --text="Sync done"
 }
 
 gamecloud_upload() {
@@ -84,7 +85,8 @@ gamecloud_upload() {
 
   zenity --notification --text="Syncing save from $local_path to $remote_path/$game_name"
   echo "{\"hostname\": \"$(hostnamectl hostname)\", \"mtime\": \"$(find "$local_path" -type f -printf "%T@\n" | sort -n | tail -n1 | cut -d . -f 1)\"}" | rclone rcat "$remote_path/$game_name.gamecloud.json"
-  # rclone sync -P $local_path $remote_path/$game_name
+  rclone sync -P $local_path $remote_path/$game_name
+  zenity --notification --text="Sync done"
 }
 
 on_sigint() {
