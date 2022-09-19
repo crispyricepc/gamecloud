@@ -2,19 +2,6 @@
 
 Game cloud save helper using rclone
 
-Currently, gamecloud only does these simple steps:
-
-1. Pull the remote save data to local
-1. Run the game
-1. Push the local save data to remote
-
-The ideal behaviour would be:
-
-1. Check if the remote save data is newer than local
-  1.a. If yes, pull the remote save data to local
-1. Run the game
-1. Push the local save data to remote
-
 ## Installation
 
 ```sh
@@ -45,5 +32,5 @@ gamecloud -r hl2 hl2_linux -game garrysmod
 #### Run from Steam
 
 ```sh
-gamecloud -r %command%
+gamecloud -r hl2 %command%
 ```
